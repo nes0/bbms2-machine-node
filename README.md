@@ -21,15 +21,12 @@ relay, two push buttons and a current transformer on the machine's supply.
 
 Every pin except the display's can be changed in `data/config.json` (the names are in `app/config.py`).
 
-**Current sensor.** The pin sees roughly the peak of the burden resistor's voltage, so the reader works out
-`amps ≈ volts × ct_turns ÷ (burden_ohms × 1.414)`. Set `burden_ohms` to the resistor fitted (the default, 100,
-is a guess) and `current_zero_mv` to what the pin reads with the machine off. The result is only compared
-with the machine's threshold from BBMS, to count motor-on seconds.
-
-**Choosing the threshold.** On the machine's *Live current* page in the BBMS admin, start reporting: at its next
-check-in (or the next tap) the reader shows the current it measures and sends it to BBMS every 2 seconds
-(`POST current`), where the page plots it against the threshold. Tap in so the machine has power, run it idle and
-working, and save a threshold between the two. Reporting stops after 15 minutes, or when the admin stops it.
+**Current sensor.** A current transformer on the machine's supply feeds an op-amp rectifier and filter, which
+gives the pin a steady voltage: about 0.29 V with the machine off, rising by about 62 mV for each amp. The
+circuit, its part values and the results of simulating it are in `current_sensor/README.md`. The reader measures the zero itself whenever the relay has been off for five
+seconds, so there is nothing to calibrate. For a different circuit, set `current_mv_per_amp` and
+`current_zero_mv` (what the pin reads with the machine off). The result is only compared with the machine's
+threshold from BBMS, to count motor-on seconds.
 
 ## Setting a reader up
 

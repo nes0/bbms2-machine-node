@@ -34,11 +34,13 @@ DEFAULTS = {
     "pin_stop_button": 32,  # the buttons connect these to ground; the internal pull-ups are used
     "pin_fault_button": 33,
     "pin_current_sensor": 34,  # must be an ADC1 pin (32-39): ADC2 doesn't work while Wi-Fi is on
-    # Current sensor: a current transformer into a burden resistor, half-wave rectified and smoothed,
-    # so the pin sees roughly the peak of (mains amps / ct_turns x burden_ohms).
-    "ct_turns": 1000,
-    "burden_ohms": 100,
-    "current_zero_mv": 0,  # what the pin reads with the machine off
+    # Current sensor (the circuit is in current_sensor/README.md): the pin's voltage rises by
+    # current_mv_per_amp for each amp the machine draws, from current_zero_mv with the machine off.
+    "current_mv_per_amp": 61.6,
+    # Only a starting point: the reader measures the zero itself whenever the relay is off. A measured
+    # zero further than current_zero_tolerance_mv from this is ignored and logged as a fault.
+    "current_zero_mv": 290,
+    "current_zero_tolerance_mv": 150,
     # Restart the reader if its main loop stops for this long (0: no watchdog).
     "watchdog_seconds": 60,
 }

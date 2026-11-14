@@ -14,6 +14,7 @@ from machine import ADC, UART, WDT, Pin, reset
 from rdm6300 import Rdm6300
 
 WIFI_RETRY_MS = 30000
+ZERO_SETTLE_MS = 5000  # after the relay opens, the current sensor's filter takes a few seconds to fall to zero
 
 
 class Button:
@@ -63,9 +64,13 @@ class Hardware:
 
         # 11 dB attenuation: the ADC then reads from about 0.15 V up to about 2.5 V.
         self._adc = ADC(Pin(settings["pin_current_sensor"]), atten=ADC.ATTN_11DB)
-        self._zero_mv = settings["current_zero_mv"]
-        # The pin holds about the peak of the burden resistor's voltage: amps x 1.414 x burden / turns.
-        self._amps_per_mv = settings["ct_turns"] / (settings["burden_ohms"] * 1414)
+        self._mv_per_amp = settings["current_mv_per_amp"]
+        self._zero_nominal_mv = settings["current_zero_mv"]
+        self._zero_tolerance_mv = settings["current_zero_tolerance_mv"]
+        self._zero_mv = self._zero_nominal_mv  # until it has been measured
+        self._zero_fault = False
+        self._relay_on = False
+        self._relay_off_since = time.ticks_ms()
 
         self._ssid = settings["wifi_ssid"]
         self._password = settings["wifi_password"]
@@ -81,6 +86,9 @@ class Hardware:
     # ---- What reader.py uses ----------------------------------------------------------------------
 
     def set_relay(self, on):
+        if self._relay_on and not on:
+            self._relay_off_since = time.ticks_ms()
+        self._relay_on = on
         self._relay.value(self._relay_on_level if on else 1 - self._relay_on_level)
 
     def amps(self):
@@ -88,7 +96,21 @@ class Hardware:
         microvolts = 0
         for _ in range(8):
             microvolts += self._adc.read_uv()
-        return max(0, microvolts / 8000 - self._zero_mv) * self._amps_per_mv
+        millivolts = microvolts / 8000
+        if not self._relay_on and time.ticks_diff(time.ticks_ms(), self._relay_off_since) > ZERO_SETTLE_MS:
+            self._measure_zero(millivolts)
+        return max(0, millivolts - self._zero_mv) / self._mv_per_amp
+
+    def _measure_zero(self, millivolts):
+        """The relay has been off for a while, so the machine draws nothing: this is what zero reads."""
+        if abs(millivolts - self._zero_nominal_mv) > self._zero_tolerance_mv:
+            if not self._zero_fault:  # say so once, not every second
+                print("current sensor: reads %d mV with the relay off; expected about %d mV. Not used as zero."
+                      % (millivolts, self._zero_nominal_mv))  # fmt: skip
+            self._zero_fault = True
+            return
+        self._zero_fault = False
+        self._zero_mv += (millivolts - self._zero_mv) / 4  # smoothed: one reading has some noise on it
 
     def poll(self, now):
         """Look at the buttons and the fob reader. Called every 30 ms or so."""
