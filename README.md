@@ -26,6 +26,11 @@ Every pin except the display's can be changed in `data/config.json` (the names a
 is a guess) and `current_zero_mv` to what the pin reads with the machine off. The result is only compared
 with the machine's threshold from BBMS, to count motor-on seconds.
 
+**Choosing the threshold.** On the machine's *Live current* page in the BBMS admin, start reporting: at its next
+check-in (or the next tap) the reader shows the current it measures and sends it to BBMS every 2 seconds
+(`POST current`), where the page plots it against the threshold. Tap in so the machine has power, run it idle and
+working, and save a threshold between the two. Reporting stops after 15 minutes, or when the admin stops it.
+
 ## Setting a reader up
 
 1. Flash MicroPython: `ESP32_GENERIC-20251209-v1.27.0.bin`, from micropython.org (not kept in this repository).
@@ -41,7 +46,7 @@ the watchdog restarts the reader a minute after you stop the program.
 ## Trying it without the hardware
 
 `python app` (needs `textual`) runs the same program in a terminal with pretend hardware: type a card number or
-a 12-hex tag and press Tap Fob. It reads `data/config.json` too; for a development server use
+a 12-hex tag and press Tap Fob. The motor switch and the amps box beside it set what the machine draws. It reads `data/config.json` too; for a development server use
 `"api_url": "http://localhost:8000/api/devices/v2/"` and the key from `manage.py create_demo_device`.
 
 ## How it differs from the fake reader
@@ -53,6 +58,7 @@ The logic is the same. The differences come from the e-paper, which takes a few 
 - A message stays for its time counted from when it has finished appearing.
 - There's no "Hello" after a tap: the session screen appears instead, after the first heartbeat.
 - A tap or press made while the reader is busy with an earlier one is dropped, not queued.
+- While reporting live current, the reading on the screen changes at most every 5 seconds.
 - If BBMS is away for long, meter readings it can't have seen are added together rather than queued one a
   minute, and one BBMS rejects as malformed (400) is dropped rather than retried for ever.
 - The first check-in to succeed is sent as `boot`, even if earlier tries failed; the QR code is asked for again

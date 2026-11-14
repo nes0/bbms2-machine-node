@@ -25,6 +25,9 @@ from util import log, now_ms, print_exception
 
 FIRMWARE_VERSION = "esp32-0.1"
 METER_REPORT_MS = 60000
+CURRENT_REPORT_MS = 2000  # live current, while an admin chooses the threshold (BBMS spec 05 §5.4)
+CURRENT_DISPLAY_MS = 5000  # the e-paper takes a few seconds to change: show a new reading at most this often
+MAX_CURRENT_SAMPLES = 60
 RETRY_MS = 15000
 MESSAGE_SECONDS = 4
 
@@ -118,6 +121,10 @@ class Reader:
         self.next_end_retry = None
         self.active_ms = 0  # motor-on time since the last meter reading was queued
         self.amps = 0
+        self.current_samples = []  # one a second while BBMS asks for live current
+        self.next_current_send = 0
+        self.shown_amps = 0  # the reading on the screen, changed at most every CURRENT_DISPLAY_MS
+        self.next_amps_shown = 0
         self.next_meter_queue = now_ms() + METER_REPORT_MS
         self.next_meter_send = 0
         self.unsent_from = None  # meter readings from this seq on have never been sent
@@ -387,6 +394,19 @@ class Reader:
             # Accepted, or a 400: BBMS will never take it, and it mustn't hold up the readings behind it.
             self.flash.set("meterQueue", [r for r in queue if r["seq"] != reading["seq"]])
 
+    # ---- Live current: while an admin is choosing the threshold, send every reading --------------
+
+    def reporting_current(self):
+        return bool(self.machine) and bool((self.machine.get("meter") or {}).get("report_current"))
+
+    async def send_current(self):
+        self.next_current_send = now_ms() + CURRENT_REPORT_MS
+        amps, self.current_samples = self.current_samples, []
+        result = await self.call("POST", "current", {"amps": amps})
+        # Not 200: those readings are lost, which doesn't matter; they're only for watching.
+        if result.ok and result.data.get("report_current") is False and self.machine:
+            self.machine.setdefault("meter", {})["report_current"] = False  # BBMS has stopped watching
+
     async def _watch_current(self):
         """Once a second: is the motor running?"""
         last = now_ms()
@@ -399,6 +419,12 @@ class Reader:
                 self.amps = self.hw.amps()
                 if self.metering_by_current() and self.threshold is not None and self.amps > self.threshold:
                     self.active_ms += step
+                if self.reporting_current():
+                    self.current_samples.append(round(self.amps, 2))
+                    if len(self.current_samples) > MAX_CURRENT_SAMPLES:  # BBMS away: keep only the latest
+                        self.current_samples = self.current_samples[-MAX_CURRENT_SAMPLES:]
+                elif self.current_samples:
+                    self.current_samples = []
             except Exception as error:
                 print_exception(error)
 
@@ -443,8 +469,14 @@ class Reader:
             await self.flush_meter(False)
         elif self.flash.get("meterQueue") and now >= self.next_meter_send:
             await self.send_meter_queue()
+        elif self.reporting_current() and self.current_samples and now >= self.next_current_send:
+            await self.send_current()
         elif self.online and not self.qr_settled:
             await self.load_qr()
+
+        if now >= self.next_amps_shown:
+            self.shown_amps = self.amps
+            self.next_amps_shown = now + CURRENT_DISPLAY_MS
 
         await self.redraw()
 
@@ -468,6 +500,20 @@ class Reader:
         machine = self.machine
         if self.message:
             return ("message", self.message[0])
+        if self.reporting_current():
+            amps = self.shown_amps
+            threshold = (machine.get("meter") or {}).get("current_threshold_amps")
+            try:
+                state = "Threshold %s A: %s" % (threshold, "running" if amps > float(threshold) else "idle")
+            except (TypeError, ValueError):
+                state = "No threshold set"
+            return (
+                "current",
+                machine.get("name") or "",
+                "%.1f A" % amps,
+                state,
+                "Tap fob or press Stop to end" if self.session else "Tap in to switch the machine on",
+            )
         if self.session:
             s = self.session
             elapsed, fee, balance = self.live_session()

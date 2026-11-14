@@ -165,6 +165,8 @@ class Screen:
             self._message(view[1])
         elif kind == "session":
             self._session(*view[1:])
+        elif kind == "current":
+            self._current(*view[1:])
         else:
             self._idle(kind, view[1:], qr)
 
@@ -191,6 +193,18 @@ class Screen:
             self.text(self.plain, W - MARGIN - self.plain.width("offline"), 65, "offline")
         self.text(self.bold if overdrawn else self.plain, MARGIN, 84, balance)
         self.text(self.plain, MARGIN, 104, "Tap fob or press Stop to end")
+
+    def _current(self, machine, amps, threshold, hint):
+        """Live current, while an admin chooses the threshold: the reading, big, against the threshold."""
+        badge = "LIVE CURRENT"
+        width = self.plain.width(badge) + 8
+        self.fill(W - 2 - width, 1, width, LINE)
+        self.text(self.plain, W - width + 2, 2, badge, white=True)
+        self.text(self.plain, MARGIN, 2, machine, right=W - 6 - width)
+        self.fill(0, 21, W, 1)
+        self.centred(self.bold, W // 2, 34, amps)
+        self.centred(self.plain, W // 2, 62, threshold)
+        self.centred(self.plain, W // 2, 100, hint)
 
     def _idle(self, kind, details, qr):
         # The QR code, if there is one, sits on the right, with "offline" beneath it.

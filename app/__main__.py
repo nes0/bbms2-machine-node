@@ -40,11 +40,14 @@ class DisplayApp(App):
     Input {
         width: 30;
     }
+    #amps {
+        width: 10;
+    }
     #buttons, #bench {
         layout: grid;
-        grid-size: 6;
+        grid-size: 7;
         grid-gutter: 2;
-        grid-columns: auto auto auto auto auto 1fr;
+        grid-columns: auto auto auto auto auto auto 1fr;
         height: auto;
     }
     #bench Label, #buttons Label {
@@ -66,8 +69,9 @@ class DisplayApp(App):
             yield Button("FAULT", id="fault", variant="warning")
             yield Label("Relay: off", id="relay")
         with Container(id="bench"):
-            yield Label("Motor running (5 A):")
+            yield Label("Motor running:")
             yield Switch(id="motor")
+            yield Input(value="5", placeholder="amps", id="amps", type="number")
             yield Label("Network:")
             yield Switch(value=True, id="network")
             yield Label("", id="status")
@@ -111,11 +115,24 @@ class DisplayApp(App):
             self.hw.press_fault()
 
     def on_input_submitted(self, event):
-        self.tap()
+        if event.input.id == "fob":
+            self.tap()
+
+    def on_input_changed(self, event):
+        if event.input.id == "amps":
+            self.set_current()
+
+    def set_current(self):
+        """What the machine draws when it has power: the amps box while the motor switch is on."""
+        try:
+            amps = max(0.0, float(self.query_one("#amps", Input).value))
+        except ValueError:
+            amps = 0.0
+        self.hw.current = amps if self.query_one("#motor", Switch).value else 0.0
 
     def on_switch_changed(self, event):
         if event.switch.id == "motor":
-            self.hw.current = 5.0 if event.value else 0.0
+            self.set_current()
         elif event.switch.id == "network":
             self.hw.network = event.value
 
