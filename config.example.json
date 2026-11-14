@@ -1,0 +1,6 @@
+{
+  "wifi_ssid": "the space's network",
+  "wifi_password": "its password",
+  "api_url": "https://bbms.buildbrighton.com/api/devices/v2/",
+  "api_key": "this reader's key, from its device page in the BBMS admin"
+}

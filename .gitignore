@@ -1,0 +1,17 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# A reader's settings (Wi-Fi password, API key) and what the simulation keeps between runs
+data/
+
+# MicroPython firmware images (from micropython.org) and the backup of the board's original flash
+*.bin
+original-flash
