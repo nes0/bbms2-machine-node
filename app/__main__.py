@@ -92,7 +92,7 @@ class DisplayApp(App):
             timeout=settings["request_timeout_seconds"],
             link_up=self.hw.link_up,
         )
-        self.reader = Reader(self.hw, api, Flash(config.DATA_DIR), screen)
+        self.reader = Reader(self.hw, api, Flash(config.DATA_DIR), screen, None, settings["offline_use"])
         self.reader_task = asyncio.create_task(self.reader.run())
 
     def show_relay(self, on):

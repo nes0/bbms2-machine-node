@@ -26,6 +26,10 @@ DEFAULTS = {
     "ca_file": DATA_DIR + "/ca.der",
     "tls_insecure": False,
     "request_timeout_seconds": 10,
+    # While BBMS can't be reached, let members on the fob list it gave earlier use the machine. Their
+    # credit can't be checked then; BBMS charges them when it hears of the session. False: nobody can
+    # tap in without BBMS.
+    "offline_use": True,
     # GPIO numbers. The e-paper's are in epaper213.py (4, 5, 16, 17, 18, 23).
     "pin_rfid_rx": 27,  # from the RDM6300's TX, through a divider: the RDM6300 is a 5 V part
     "pin_rfid_tx": 25,  # not connected, but the UART must be given a pin that isn't used elsewhere

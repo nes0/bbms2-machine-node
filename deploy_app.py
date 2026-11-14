@@ -1,13 +1,17 @@
 # /// script
 # requires-python = ">=3.13"
-# dependencies = ["pyserial"]
+# dependencies = ["pyserial", "mpy-cross>=1.27,<1.28"]
 # ///
-
+"""
+Upload the firmware to a reader over USB: `uv run deploy_app.py`. The files are compiled first (build.py),
+and anything on the reader that isn't part of the firmware is deleted, except its own /data folder.
+"""
 
 import glob
 import hashlib
 import os
 
+from build import BUILD, build
 from pyboard import Pyboard
 
 
@@ -71,10 +75,8 @@ def put_file_if_changed(board, local_path, remote_path):
     with open(local_path, "rb") as f:
         data = f.read()
 
-    board.exec_(f"""
-with open('{remote_path}', 'wb') as f:
-    f.write({data})
-""")
+    # A block at a time: the reader hasn't the memory to be sent a whole file in one command.
+    board.fs_writefile(remote_path, data)
     return True
 
 
@@ -196,9 +198,7 @@ def upload_globs(
 
 PORT = "/dev/ttyUSB0"
 
-PATTERNS = [
-    "app/font/*.py",
-] + [f for f in glob.glob("app/*.py") if os.path.basename(f) != "__main__.py"]
+PATTERNS = sorted(build().values())  # compiled into build/app: .mpy files, and main.py as it is
 
 board = Pyboard(PORT)
 board.enter_raw_repl()
@@ -206,7 +206,7 @@ board.enter_raw_repl()
 upload_globs(
     board,
     patterns=PATTERNS,
-    local_root="app",
+    local_root=BUILD,
     remote_root="",
     delete_unmatched_files=True,
 )

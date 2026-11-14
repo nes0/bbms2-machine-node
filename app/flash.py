@@ -3,8 +3,9 @@
 #
 # RFID tag machine access
 #
-# What the reader must remember through a power cut: the meter sequence number, meter readings not yet
-# sent, and the QR code. Small values are kept together in one JSON file; the QR code has its own file.
+# What the reader must remember through a power cut: the meter sequence number, meter readings and
+# sessions not yet sent, the machine's details and the QR code. Small values are kept together in one
+# JSON file; the QR code has its own file, and so does the fob list (fobs.py).
 #
 
 import json
