@@ -23,6 +23,11 @@ ETX = 0x03
 # together afterwards, and by the clock alone that looks like a fob that went away and came back.
 AWAY_MS = 1500
 QUIET_STEP_MS = 100  # the most that one look with nothing there adds to the time away
+# A fob is believed when two frames running say the same, no further apart than this. The checksum is
+# one byte, so interference that looks like a frame gets past it one time in 256, as a fob nobody
+# holds: but not twice running with the same number. A real fob sends several frames a second.
+CONFIRM_MS = 1000
+NO_TAG = "000000000000"  # passes the checksum, and isn't a fob
 # A tap nobody has acted on by now is forgotten (the reader was busy; the member will have tried again).
 STALE_MS = 5000
 
@@ -31,7 +36,9 @@ class Rdm6300:
     def __init__(self, uart):
         self.uart = uart  # anything with any() and read(n), like machine.UART
         self._frame = None  # the characters since STX, or None when between frames
-        self._last_tag = None
+        self._heard = None  # the tag in the last good frame, believed or not
+        self._heard_at = 0
+        self._last_tag = None  # the last fob believed
         self._quiet = 0  # how long the reader has looked and heard nothing, in milliseconds
         self._polled = None
         self._tap = None
@@ -88,6 +95,14 @@ class Rdm6300:
         return text if checksum == 0 else None
 
     def _seen(self, tag, now):
+        """A good frame has arrived. True if it makes a new tap."""
+        if tag == NO_TAG:
+            return False
+        confirmed = tag == self._heard and now - self._heard_at <= CONFIRM_MS
+        self._heard = tag
+        self._heard_at = now
+        if not confirmed:
+            return False  # wait for the next frame to say the same
         tapped = tag != self._last_tag or self._quiet > AWAY_MS
         if tapped:
             self._tap = tag

@@ -414,6 +414,7 @@ class Reader:
     # ---- Fob taps and buttons -------------------------------------------------------------------
 
     async def tap(self, card):
+        log("fob read:", card)  # so that a tap nobody made can be told from a real fob
         session = self.session
         if session and session.offline:
             if card == session.card:
