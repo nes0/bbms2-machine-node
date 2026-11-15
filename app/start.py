@@ -77,7 +77,7 @@ def _load():
     from flash import Flash
 
     gc.collect()
-    from ota import Updater
+    from updater import Updater
 
     gc.collect()
     from reader import Reader
@@ -125,7 +125,7 @@ def run():
         # connections than not running at all.
         log("not enough memory to load with that held back: loading again without")
         release(held)
-        for name in ("bbms_api", "flash", "ota", "reader", "fobs", "offline", "version"):
+        for name in ("bbms_api", "flash", "updater", "reader", "fobs", "offline", "version"):
             sys.modules.pop(name, None)
         gc.collect()
         Api, Flash, Updater, Reader = _load()

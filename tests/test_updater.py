@@ -1,5 +1,5 @@
 """
-Firmware updates, tested on a computer: the loader (app/main.py) and the downloader (app/ota.py) working
+Firmware updates, tested on a computer: the loader (app/main.py) and the downloader (app/updater.py) working
 on a folder that stands in for the ESP32's flash. Run with `python -m unittest discover tests`.
 """
 
@@ -14,7 +14,7 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "app"))
 
 import main as loader  # noqa: E402
-import ota  # noqa: E402
+import updater as updater_module  # noqa: E402
 from bbms_api import Result  # noqa: E402
 
 
@@ -54,6 +54,16 @@ class FakeBbms:
         return Result(404)
 
 
+class Names(unittest.TestCase):
+    def test_no_file_is_named_after_a_folder_on_the_reader(self):
+        # MicroPython imports a folder in preference to a file of the same name, and these folders
+        # aren't firmware: with /ota there, "import ota" found the folder and nothing could start.
+        app = os.path.join(os.path.dirname(__file__), "..", "app")
+        modules = {name[:-3] for name in os.listdir(app) if name.endswith(".py")}
+        folders = {updater_module.OTA.strip("/"), loader.OTA.strip("/"), "data"}
+        self.assertEqual(modules & folders, set())
+
+
 class OtaTests(unittest.TestCase):
     def setUp(self):
         self.folder = tempfile.TemporaryDirectory()
@@ -87,14 +97,14 @@ class OtaTests(unittest.TestCase):
             return None
 
     def fetch(self, bbms, version="2"):
-        asyncio.run(ota.Updater(self.root).fetch(bbms, version))
+        asyncio.run(updater_module.Updater(self.root).fetch(bbms, version))
 
     def install(self, release=None, version="2"):
         """Download, restart into the loader, and have the new firmware check in."""
         self.fetch(FakeBbms(version, release or self.release), version)
         self.assertTrue(loader.apply_pending(self.root))
         loader.count_trial_start(self.root)
-        updater = ota.Updater(self.root)
+        updater = updater_module.Updater(self.root)
         self.assertTrue(updater.on_trial)
         updater.confirm()
 
@@ -111,7 +121,7 @@ class OtaTests(unittest.TestCase):
         self.assertEqual(self.get("main.py"), b"the loader")
         self.assertEqual(self.get("data/state.json"), b"{}")
         self.assertFalse(os.path.exists(os.path.join(self.root, "ota/old")))
-        self.assertFalse(ota.Updater(self.root).on_trial)
+        self.assertFalse(updater_module.Updater(self.root).on_trial)
         self.assertFalse(loader.count_trial_start(self.root))
 
     def test_a_file_dropped_from_the_next_release_is_removed(self):
@@ -131,7 +141,7 @@ class OtaTests(unittest.TestCase):
         self.assertEqual(self.get("reader.py"), b"reader 1")
         self.assertEqual(self.get("version.py"), b'VERSION = "1"')
         self.assertIsNone(self.get("extra.py"))
-        updater = ota.Updater(self.root)
+        updater = updater_module.Updater(self.root)
         self.assertFalse(updater.on_trial)
         self.assertEqual(updater.failure()["version"], "2")
 
@@ -144,24 +154,24 @@ class OtaTests(unittest.TestCase):
         loader.roll_back(self.root, "it broke")
         self.assertEqual(self.get("extra.py"), b"new")
         self.assertEqual(self.get("reader.py"), b"reader 2")
-        self.assertEqual(ota.Updater(self.root).failure(), {"version": "3", "error": "it broke"})
+        self.assertEqual(updater_module.Updater(self.root).failure(), {"version": "3", "error": "it broke"})
 
     def test_a_damaged_download_changes_nothing(self):
         bbms = FakeBbms("2", self.release)
         bbms.damage = "reader.py"
-        with self.assertRaises(ota.UpdateError):
+        with self.assertRaises(updater_module.UpdateError):
             self.fetch(bbms)
         self.assertFalse(loader.apply_pending(self.root))
         self.assertEqual(self.get("reader.py"), b"reader 1")
 
     def test_a_manifest_naming_the_loader_or_a_path_outside_is_refused(self):
         for path in ("main.py", "boot.py", "data/config.py", "ota/x.py", "../x.py", "/x.py", "a b.py", "x.txt"):
-            with self.subTest(path=path), self.assertRaises(ota.UpdateError):
+            with self.subTest(path=path), self.assertRaises(updater_module.UpdateError):
                 self.fetch(FakeBbms("2", {**self.release, path: b"bad"}))
         self.assertEqual(self.get("main.py"), b"the loader")
 
     def test_a_manifest_for_another_version_is_refused(self):
-        with self.assertRaises(ota.UpdateError):
+        with self.assertRaises(updater_module.UpdateError):
             self.fetch(FakeBbms("9", self.release), "2")
 
     def test_a_power_cut_while_files_are_being_moved(self):

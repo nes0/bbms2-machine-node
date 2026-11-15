@@ -7,6 +7,10 @@
 # this reader to run into /ota/new and leaves the rest to the loader (main.py, which explains the whole
 # sequence) at the next start.
 #
+# This file must not be called ota.py. MicroPython, asked to import "ota", finds the folder /ota before
+# it finds ota.mpy and imports the folder, which has nothing in it: once a first update had made the
+# folder, no firmware could start. The same goes for any file named after a folder on the reader.
+#
 
 import binascii
 import hashlib

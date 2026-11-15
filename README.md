@@ -209,7 +209,7 @@ nobody can tap in without BBMS.
 | `app/main.py` | the loader: what the ESP32 runs first. Puts firmware updates in place, starts the reader, and undoes an update that doesn't work |
 | `app/start.py` | starting the reader |
 | `app/version.py` | this firmware's version |
-| `app/ota.py` | downloading a firmware update from BBMS |
+| `app/updater.py` | downloading a firmware update from BBMS |
 | `app/reader.py` | the reader's behaviour (no hardware in here) |
 | `app/fobs.py` | the list of fobs to accept while BBMS can't be reached |
 | `app/offline.py` | the time, and the sessions waiting to be sent to BBMS |
