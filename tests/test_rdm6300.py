@@ -81,9 +81,35 @@ class Taps(unittest.TestCase):
         self.assertEqual(self.run_for(300, KIM), 0)
 
     def test_damaged_frames_are_ignored(self):
-        self.uart.waiting += b"\x02700012D68734\x03" + b"\x02700012D6\x03" + b"junk"
+        self.uart.waiting += (b"\x02700012D68734\x03" + b"\x02700012D6\x03" + b"junk") * 2
         self.assertFalse(self.rfid.poll(10))
         self.assertEqual(self.rfid.take(10), None)
+
+    def test_one_frame_alone_isnt_believed(self):
+        # Interference that happens to pass the checksum: once, or twice with different numbers.
+        self.uart.waiting += SAM
+        self.assertFalse(self.rfid.poll(10))
+        self.assertEqual(self.run_for(3000), 0)
+        self.uart.waiting += SAM  # the same again, but long after
+        self.assertFalse(self.rfid.poll(self.now))
+        self.uart.waiting += KIM
+        self.assertFalse(self.rfid.poll(self.now))
+        self.assertEqual(self.rfid.take(self.now), None)
+
+    def test_two_frames_running_are_a_tap(self):
+        self.uart.waiting += KIM
+        self.assertFalse(self.rfid.poll(10))
+        self.uart.waiting += KIM
+        self.assertTrue(self.rfid.poll(80))
+        self.assertEqual(self.rfid.take(80), "700012D68733")
+
+    def test_a_stray_frame_doesnt_make_a_held_fob_tap_again(self):
+        self.assertEqual(self.run_for(300, KIM), 1)
+        self.uart.waiting += SAM
+        self.assertEqual(self.run_for(300, KIM), 0)
+
+    def test_all_zeros_is_never_a_fob(self):
+        self.assertEqual(self.run_for(300, b"\x02000000000000\x03"), 0)
 
 
 if __name__ == "__main__":
