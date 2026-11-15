@@ -717,7 +717,10 @@ class Reader:
                 await self.tap(card)
             else:
                 await self.fault_button()
-            hw.discard_inputs()  # whatever was tapped or pressed while that was going on
+            await self.redraw()  # the answer first: nothing else is taken in until it can be read
+            # Whatever was tapped or pressed while that was going on is dropped. That includes the same
+            # fob, still held on the reader: it has to be taken away before it counts as another tap.
+            hw.discard_inputs()
             now = now_ms()
 
         idle = not (self.session or self.pending_end or self.message)
@@ -796,22 +799,13 @@ class Reader:
             elapsed, fee, balance = self.live_session()
             hours, minutes = elapsed // 3600, elapsed % 3600 // 60
             time = "%d h %02d min" % (hours, minutes) if hours else "%d min" % minutes
-            name = machine.get("name") or "" if machine else ""
             if s.offline:
                 # BBMS works out the charge when it hears of the session: what's shown is a guide.
                 charge = "About " + pounds(fee) if s.rate else "Free to use"
-                return ("session", name, "OFFLINE", s.name, time, charge, "Charged when BBMS is back", False, False)
-            return (
-                "session",
-                name,
-                s.reason.upper(),
-                s.name,
-                time,
-                "No charge" if s.reason else "Charge " + pounds(fee),
-                "Balance " + pounds(balance),
-                balance < 0,
-                offline,
-            )
+                return ("session", "OFFLINE", s.name, time, charge, None, "Charged when BBMS is back", False)
+            # (badge, member, time, charge, balance, a note in place of the balance, BBMS can't be reached)
+            charge = "None" if s.reason else pounds(fee)
+            return ("session", s.reason.upper(), s.name, time, charge, pounds(balance), None, offline)
         if self.disabled:
             return ("notice", "Reader disabled", "Ask an admin", self.qr_version, False)
         if not machine:

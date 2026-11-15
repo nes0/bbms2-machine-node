@@ -341,7 +341,7 @@ class WithoutBbms(ReaderCase):
                 self.tap()
                 self.assertTrue(self.hw.relay)
                 self.assertEqual(self.screen.view[0], "session")
-                self.assertEqual(self.screen.view[2:4], ("OFFLINE", "Kim K."))
+                self.assertEqual(self.screen.view[1:3], ("OFFLINE", "Kim K."))
                 self.tap()
                 self.assertFalse(self.hw.relay)
                 self.bbms.fault = None
@@ -556,7 +556,7 @@ class SessionsBbmsStarted(ReaderCase):
         self.bbms.fault = None
         self.run_for(120)
         self.assertTrue(self.hw.relay)  # the member wasn't cut off
-        self.assertEqual(self.screen.view[2], "OFFLINE")
+        self.assertEqual(self.screen.view[1], "OFFLINE")
         self.tap()
         self.assertFalse(self.hw.relay)
         ended = self.bbms.time()
