@@ -17,7 +17,6 @@ import time
 import config
 from util import log, print_exception
 
-
 # Memory. The ESP32 has about 240 KB, in two pools. MicroPython's holds this program and starts at 56 KB.
 # When that isn't enough it takes more from the system's pool: as much again as it already has, or the
 # largest free piece if that's smaller, and it never gives any back. The system's pool is what Wi-Fi

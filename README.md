@@ -1,5 +1,16 @@
 # Machine reader (ESP32, MicroPython)
 
+[![CI](https://github.com/nes0/bbms2-machine-node/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nes0/bbms2-machine-node/actions/workflows/ci.yml)
+[![Release](https://github.com/nes0/bbms2-machine-node/actions/workflows/release.yml/badge.svg)](https://github.com/nes0/bbms2-machine-node/actions/workflows/release.yml)
+[![Latest firmware](https://img.shields.io/github/v/release/nes0/bbms2-machine-node?label=firmware)](https://github.com/nes0/bbms2-machine-node/releases/latest)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![MicroPython 1.27](https://img.shields.io/badge/MicroPython-1.27-blue)](https://micropython.org/download/ESP32_GENERIC/)
+[![Licence: GPL-2.0-or-later](https://img.shields.io/badge/licence-GPL--2.0--or--later-blue)](https://spdx.org/licenses/GPL-2.0-or-later.html)
+
+A fob reader for one machine: a fob tap starts a session in BBMS and switches the machine on; a tap or the
+Stop button ends it. It is the fake reader on BBMS's `/dev/fake-device/` page (`static/access/fake_device.js`)
+rewritten for the real hardware, and talks to BBMS through the v2 device API (`docs/device-api-v2.md`).
+
 ## Hardware
 
 ESP32 (MicroPython v1.27.0, `ESP32_GENERIC`), a 2.13" 250 × 122 e-paper display, an RDM6300 fob reader, a
@@ -70,7 +81,12 @@ Once a reader has been set up over USB, BBMS can send it new firmware:
 
 1. Change `VERSION` in `app/version.py`. Readers and BBMS tell firmware apart by this name alone, and BBMS
    refuses a version it has already been given.
-2. `uv run make_release.py` compiles the firmware and makes `dist/reader-<version>.zip`.
+2. Make the release on GitHub: **Actions > Release > Run workflow** on `main`, or push a tag
+   (`git tag v1.2.0 && git push origin v1.2.0`). After the lint and tests pass, it compiles the firmware and
+   attaches `reader-<version>.zip` to a GitHub release tagged `v<version>`. It refuses if the version isn't
+   higher than every release so far, or if a tag you pushed doesn't match `app/version.py`
+   (`release_check.py`). To build the same zip on your own computer: `uv run make_release.py`, which
+   leaves it in `dist/`.
 3. In BBMS's admin, **Access > Firmware releases > Add**: upload the zip, then tick the readers to run it.
    Try one reader first.
 
@@ -208,4 +224,7 @@ nobody can tap in without BBMS.
 | `build.py` | compiling the firmware for the reader; used by the two scripts below |
 | `deploy_app.py`, `pyboard.py` | uploading to the reader over USB |
 | `make_release.py` | building a release to upload to BBMS |
+| `release_check.py` | the check that the version has moved on since the last release |
+| `.github/workflows/` | CI (lint, tests, a build) and the Release job |
+| `ruff.toml` | lint and format settings |
 | `tests/` | tests that run on a computer |
