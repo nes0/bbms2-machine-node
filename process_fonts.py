@@ -62,6 +62,20 @@ def render_font_ttb_ltr(ttf_path: Path, font_size: int, padding: int = 1):
 
         font_table[ch] = glyph
 
+    # The digits are all one width, which leaves the "1" with blank columns before it and a gap in
+    # "£12": give it no more than the "0" has.
+    blank = bytearray(rows_bytes).replace(b"\x00", b"\xff")
+
+    def leading_blanks(glyph):
+        count = 0
+        while count < len(glyph) - 1 and glyph[count] == blank:
+            count += 1
+        return count
+
+    extra = leading_blanks(font_table["1"]) - leading_blanks(font_table["0"])
+    if extra > 0:
+        del font_table["1"][:extra]
+
     return font_table, rows, rows_bytes
 
 
@@ -101,7 +115,7 @@ if __name__ == "__main__":
     # The fonts the reader program draws with (app/screen.py).
     manifest = [
         ("ari/ari-w9500-condensed-display.ttf", 16),
-        ("ari/ari-w9500-condensed-bold.ttf", 16),
+        ("ari/ari-w9500-bold.ttf", 16),
     ]
 
     for filename, size in manifest:

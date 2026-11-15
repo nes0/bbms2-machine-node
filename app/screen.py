@@ -12,7 +12,7 @@
 # The reader (reader.py) describes each screen as a tuple of plain values, a "view"; render() draws it.
 #
 
-from font import packed_ari_w9500_condensed_bold, packed_ari_w9500_condensed_display
+from font import packed_ari_w9500_bold, packed_ari_w9500_condensed_display
 
 W = 250
 H = 122
@@ -79,7 +79,7 @@ class Screen:
     def __init__(self, epd):
         self.epd = epd
         self.bold = Font(packed_ari_w9500_condensed_display)
-        self.plain = Font(packed_ari_w9500_condensed_bold)
+        self.plain = Font(packed_ari_w9500_bold)
 
     # ---- Drawing --------------------------------------------------------------------------------
 

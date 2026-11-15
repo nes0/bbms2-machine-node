@@ -44,6 +44,14 @@ installs. Only `main.py` goes as source, because MicroPython won't run a compile
 must match the MicroPython on the reader: if you flash a newer MicroPython, change the `mpy-cross` version at
 the top of `deploy_app.py` and `make_release.py` to match.
 
+**Memory is tight.** The ESP32 has about 240 KB, shared between MicroPython and the system (Wi-Fi, and the
+secure connection to BBMS, which needs about 40 KB). This firmware needs a little more than MicroPython starts
+with, and left alone MicroPython would then take so much that no secure connection could be made. `app/start.py`
+prevents that by holding the connections' memory back while the program loads; the comment there explains it, and
+at start-up it logs four lines beginning `memory` that show how the memory was shared out. `system ... free` in the
+last of them should be above 40000. A module with extra RAM (ESP32-WROVER, or an S3 with PSRAM) and MicroPython's
+SPIRAM build would remove the limit, but those modules use GPIO 16 and 17, which the e-paper is wired to here.
+
 The reader's serial console logs every request and reply. While developing, set `"watchdog_seconds": 0`, or
 the watchdog restarts the reader a minute after you stop the program.
 

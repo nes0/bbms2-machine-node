@@ -712,6 +712,34 @@ class HttpFailures(unittest.TestCase):
         self.assertTrue(result.ok)
         self.assertEqual(len(seen), 1)
 
+    def test_failures_of_the_secure_connection_are_told_apart(self):
+        # The errors as MicroPython on the ESP32 gives them.
+        cases = {
+            "OSError(-17040, 'MBEDTLS_ERR_RSA_PUBLIC_FAILED+MBEDTLS_ERR_MPI_ALLOC_FAILED')": "Out of memory",
+            "MemoryError('memory allocation failed, allocating 16717 bytes')": "Out of memory",
+            "OSError(-9984, 'MBEDTLS_ERR_X509_CERT_VERIFY_FAILED')": "Certificate problem",
+            "OSError(-30592, 'MBEDTLS_ERR_SSL_FATAL_ALERT_MESSAGE')": "Secure link failed (-30592)",
+            "OSError(-29312, 'MBEDTLS_ERR_SSL_CONN_EOF')": "Secure link failed (-29312)",
+        }
+        for error, why in cases.items():
+            with self.subTest(error):
+
+                class Shown(Exception):
+                    def __repr__(self):
+                        return error
+
+                class Failing(Api):
+                    async def _exchange(self, *args):
+                        self._stage = "wait"
+                        raise Shown()
+
+                async def go():
+                    return await Failing("https://bbms.example/", "key").request("POST", "check-in", {})
+
+                result = asyncio.run(go())
+                self.assertTrue(result.cut_off)
+                self.assertEqual(result.why, why)
+
     def test_no_wifi(self):
         async def go():
             api = Api("http://127.0.0.1:1/", "key", link_up=lambda: False)
