@@ -1,0 +1,33 @@
+# On every push and pull request, and before a release (release.yml): lint, the tests, and a build of the
+# firmware bundle, which is kept with the run for a few weeks.
+name: CI
+
+on:
+  push:
+    branches: ["**"]  # not tags: release.yml runs these checks itself
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      # mpy-cross must match the MicroPython on the readers (see the README).
+      - run: pip install ruff==0.17.4 "mpy-cross>=1.27,<1.28"
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: python -m unittest discover tests
+      - run: python make_release.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware-bundle
+          path: dist/reader-*.zip
+          if-no-files-found: error
+          retention-days: 30

@@ -40,12 +40,15 @@ DEFAULTS = {
     "pin_display_rst": 25,
     "pin_display_busy": 4,
     "pin_rfid_rx": 27,  # from the RDM6300's TX, through a divider: the RDM6300 is a 5 V part
-    "pin_rfid_tx": 13,  # not connected, but the UART must be given a pin that isn't used elsewhere
+    "pin_rfid_tx": 14,  # not connected, but the UART must be given a pin that isn't used elsewhere
     "pin_relay": 26,
     "relay_active_high": True,
     "pin_stop_button": 32,  # the buttons connect these to ground; the internal pull-ups are used
     "pin_fault_button": 33,
     "pin_current_sensor": 34,  # must be an ADC1 pin (32-39): ADC2 doesn't work while Wi-Fi is on
+    # A piezo sounder (the kind without its own oscillator) between this pin and ground: it chirps when
+    # a fob is read and when the machine is switched on or off. null: no sounder.
+    "pin_buzzer": 13,
     # Current sensor (the circuit is in current_sensor/README.md): the pin's voltage rises by
     # current_mv_per_amp for each amp the machine draws, from current_zero_mv with the machine off.
     "current_mv_per_amp": 61.6,

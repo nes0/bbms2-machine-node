@@ -3,18 +3,24 @@
 #
 # RFID tag machine access
 #
-# The ESP32's side of the reader: relay, buttons, fob reader, current sensor, Wi-Fi and watchdog.
+# The ESP32's side of the reader: relay, buttons, fob reader, sounder, current sensor, Wi-Fi and watchdog.
 # The pin numbers come from config.py. (simulation/sim_hardware.py is the pretend version of this.)
 #
 
 import time
 
 import network
-from machine import ADC, UART, WDT, Pin, reset
+from machine import ADC, PWM, UART, WDT, Pin, reset
 from rdm6300 import Rdm6300
 
 WIFI_RETRY_MS = 30000
 ZERO_SETTLE_MS = 5000  # after the relay opens, the current sensor's filter takes a few seconds to fall to zero
+
+# What the sounder plays: (frequency in Hz, milliseconds) for each note. The reader does nothing else
+# while one plays, so they are short.
+CHIRP_FOB = ((2700, 60),)  # a fob has been read
+CHIRP_ON = ((1800, 70), (2700, 100))  # the machine has been switched on: rising
+CHIRP_OFF = ((2700, 70), (1800, 100))  # and off: falling
 
 
 class Button:
@@ -50,6 +56,13 @@ class Hardware:
         self._relay_on_level = 1 if settings["relay_active_high"] else 0
         self._relay = Pin(settings["pin_relay"], Pin.OUT, value=1 - self._relay_on_level)
 
+        self._buzzer = None
+        if settings["pin_buzzer"] is not None:
+            try:
+                self._buzzer = PWM(Pin(settings["pin_buzzer"]), freq=CHIRP_FOB[0][0], duty_u16=0)
+            except Exception as error:  # the reader works without it
+                print("buzzer:", repr(error))
+
         self._watchdog = None
         if settings["watchdog_seconds"]:
             self._watchdog = WDT(timeout=settings["watchdog_seconds"] * 1000)
@@ -57,7 +70,7 @@ class Hardware:
         self._stop = Button(settings["pin_stop_button"])
         self._fault = Button(settings["pin_fault_button"])
 
-        # UART 2's usual pins (16 and 17) belong to the e-paper, so both pins are always named here.
+        # UART 2's usual pins (16 and 17) are kept free, so both pins are always named here.
         uart = UART(2, baudrate=9600, bits=8, parity=None, stop=1, tx=settings["pin_rfid_tx"],
                     rx=settings["pin_rfid_rx"], rxbuf=256, timeout=0)  # fmt: skip
         self._rfid = Rdm6300(uart)
@@ -86,10 +99,28 @@ class Hardware:
     # ---- What reader.py uses ----------------------------------------------------------------------
 
     def set_relay(self, on):
+        changed = on != self._relay_on
         if self._relay_on and not on:
             self._relay_off_since = time.ticks_ms()
         self._relay_on = on
         self._relay.value(self._relay_on_level if on else 1 - self._relay_on_level)
+        if changed:
+            self.chirp(CHIRP_ON if on else CHIRP_OFF)
+
+    def chirp(self, notes):
+        """Play a few notes on the sounder, if there is one. Returns when they have finished."""
+        buzzer = self._buzzer
+        if not buzzer:
+            return
+        try:
+            for frequency, milliseconds in notes:
+                buzzer.freq(frequency)
+                buzzer.duty_u16(32768)
+                time.sleep_ms(milliseconds)
+        except Exception as error:
+            print("buzzer:", repr(error))
+        finally:
+            buzzer.duty_u16(0)
 
     def amps(self):
         """Roughly the machine's current. Good enough to tell "motor running" from "motor stopped"."""
@@ -116,7 +147,8 @@ class Hardware:
         """Look at the buttons and the fob reader. Called every 30 ms or so."""
         self._stop.poll()
         self._fault.poll()
-        self._rfid.poll(now)
+        if self._rfid.poll(now):
+            self.chirp(CHIRP_FOB)
         if not self._wlan.isconnected() and time.ticks_diff(time.ticks_ms(), self._wifi_tried) > WIFI_RETRY_MS:
             self._wifi_connect()  # the ESP32 reconnects by itself; this is for when it has given up
 

@@ -1,0 +1,52 @@
+# Publishes a firmware release: dist/reader-<version>.zip, attached to a GitHub release tagged v<version>.
+# The version is the one in app/version.py, and must be higher than every release so far.
+#
+# Two ways to start it:
+#   - Actions > Release > Run workflow, on the main branch. It makes the tag.
+#   - Push a tag yourself: git tag v1.2.0 && git push origin v1.2.0. The tag must match app/version.py.
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  release:
+    needs: checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # to make the tag and the release
+    env:
+      TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Releases are made from the main branch
+        if: github.ref_type == 'branch' && github.ref_name != github.event.repository.default_branch
+        run: |
+          echo "::error::Run this on ${{ github.event.repository.default_branch }}, not on a side branch."
+          exit 1
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # with the tags, to compare versions
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install "mpy-cross>=1.27,<1.28"
+      - name: Check the version has moved on
+        id: version
+        run: |
+          version=$(python release_check.py "$TAG")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - run: python make_release.py
+      - name: Publish
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: >-
+          gh release create "v$VERSION" "dist/reader-$VERSION.zip"
+          --target "$GITHUB_SHA" --title "Reader firmware $VERSION" --generate-notes

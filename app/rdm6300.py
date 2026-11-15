@@ -18,7 +18,11 @@ STX = 0x02
 ETX = 0x03
 
 # A fob held on the reader is one tap: the same fob counts again only after it has been away this long.
+# "Away" is time in which the reader looked and nothing had arrived. Time in which it couldn't look (it
+# was held up setting up a secure connection, say) doesn't count: the frames sent meanwhile are all read
+# together afterwards, and by the clock alone that looks like a fob that went away and came back.
 AWAY_MS = 1500
+QUIET_STEP_MS = 100  # the most that one look with nothing there adds to the time away
 # A tap nobody has acted on by now is forgotten (the reader was busy; the member will have tried again).
 STALE_MS = 5000
 
@@ -28,19 +32,29 @@ class Rdm6300:
         self.uart = uart  # anything with any() and read(n), like machine.UART
         self._frame = None  # the characters since STX, or None when between frames
         self._last_tag = None
-        self._last_seen = 0
+        self._quiet = 0  # how long the reader has looked and heard nothing, in milliseconds
+        self._polled = None
         self._tap = None
         self._tap_at = 0
 
     def poll(self, now):
-        """Take in whatever has arrived. Call this often (now: milliseconds, see util.now_ms)."""
+        """
+        Take in whatever has arrived. Call this often (now: milliseconds, see util.now_ms).
+        Returns True if that was a new tap.
+        """
+        tapped = False
         waiting = self.uart.any()
         if waiting:
             data = self.uart.read(waiting)
             if data:
-                self.feed(data, now)
+                tapped = self.feed(data, now)
+        elif self._polled is not None:
+            self._quiet += min(now - self._polled, QUIET_STEP_MS)
+        self._polled = now
+        return tapped
 
     def feed(self, data, now):
+        tapped = False
         for byte in data:
             if byte == STX:
                 self._frame = bytearray()
@@ -49,12 +63,13 @@ class Rdm6300:
             elif byte == ETX:
                 tag = self._check(self._frame)
                 self._frame = None
-                if tag:
-                    self._seen(tag, now)
+                if tag and self._seen(tag, now):
+                    tapped = True
             elif len(self._frame) < 12:
                 self._frame.append(byte)
             else:
                 self._frame = None  # too long to be a frame
+        return tapped
 
     @staticmethod
     def _check(frame):
@@ -73,11 +88,13 @@ class Rdm6300:
         return text if checksum == 0 else None
 
     def _seen(self, tag, now):
-        if tag != self._last_tag or now - self._last_seen > AWAY_MS:
+        tapped = tag != self._last_tag or self._quiet > AWAY_MS
+        if tapped:
             self._tap = tag
             self._tap_at = now
         self._last_tag = tag
-        self._last_seen = now
+        self._quiet = 0
+        return tapped
 
     def take(self, now):
         """The fob tapped since the last call, or None."""
@@ -88,4 +105,6 @@ class Rdm6300:
         return tap
 
     def discard(self):
+        """Forget a tap nobody has acted on. A fob that is still there has to go away before it counts again."""
         self._tap = None
+        self._quiet = 0

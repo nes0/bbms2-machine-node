@@ -176,23 +176,44 @@ class Screen:
         for i, line in enumerate(lines):
             self.centred(self.bold if i == 0 else self.plain, W // 2, y + i * pitch, line)
 
-    def _session(self, machine, badge, member, time, charge, balance, overdrawn, offline):
+    def _session(self, badge, member, time, charge, balance, note, offline):
+        """
+        A session: the member across the top, then the time on the left and the money on the right.
+        All in the larger font: this is read from where the member stands at the machine.
+        """
+        font = self.bold
         right = W - MARGIN
         if badge:
-            width = self.plain.width(badge) + 8
+            width = font.width(badge) + 8
             right = W - 2 - width
             self.fill(right, 1, width, LINE)
-            self.text(self.plain, right + 4, 2, badge, white=True)
+            self.text(font, right + 4, 2, badge, white=True)
             right -= 4
-        self.text(self.plain, MARGIN, 2, machine, right=right)
+        self.text(font, MARGIN, 2, member, right=right)
         self.fill(0, 21, W, 1)
-        self.text(self.bold, MARGIN, 25, member, right=W - MARGIN)
-        self.text(self.bold, MARGIN, 45, time)
-        self.text(self.plain, MARGIN, 65, charge)
+
+        middle = 118  # the line between the columns
+        self.fill(middle, 26, 1, H - 30)
+        self.text(font, MARGIN, 27, "Time", right=middle - 3)
+        self.text(font, MARGIN, 46, time, right=middle - 3)
         if offline:
-            self.text(self.plain, W - MARGIN - self.plain.width("offline"), 65, "offline")
-        self.text(self.bold if overdrawn else self.plain, MARGIN, 84, balance)
-        self.text(self.plain, MARGIN, 104, "Tap fob or press Stop to end")
+            self.text(font, MARGIN, 65, "BBMS offline", right=middle - 3)
+        for i, line in enumerate(("Tap fob or", "Stop to end")):
+            self.text(font, MARGIN, 84 + i * LINE, line, right=middle - 3)
+
+        x = middle + 6
+        self.text(font, x, 27, "Charge")
+        self.text(font, x, 46, charge)
+        if balance is None:  # an offline session: BBMS works the charge out afterwards
+            for i, line in enumerate(font.wrap(note or "", W - MARGIN - x, 2)):
+                self.text(font, x, 74 + i * LINE, line)
+        else:
+            self.text(font, x, 74, "Balance")
+            if balance.startswith("-"):  # overdrawn: white on black
+                self.fill(x - 3, 92, font.width(balance) + 6, LINE)
+                self.text(font, x, 93, balance, white=True)
+            else:
+                self.text(font, x, 93, balance)
 
     def _current(self, machine, amps, threshold, hint):
         """Live current, while an admin chooses the threshold: the reading, big, against the threshold."""

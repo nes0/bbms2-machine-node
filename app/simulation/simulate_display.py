@@ -8,7 +8,6 @@
 # Display simulation (terminal mode Textual widget)
 #
 
-import math
 
 import display_base
 from textual.reactive import reactive
@@ -74,7 +73,6 @@ class BrailleDisplay(Widget):
             return "No framebuffer"
 
         lines = framebuffer_to_braille(self.framebuffer)
-        width = len(lines[0])
         return "\n".join(lines)
 
 
