@@ -164,6 +164,7 @@ class Reader:
         # Everything from here on is lost when the power goes; what must survive is in self.flash.
         self.online = False
         self.trouble = None  # why the last request failed, in a few words
+        self.trouble_detail = None  # and more about it, for whoever is finding out why
         self.failures = 0  # check-ins that have failed one after another
         self.disabled = bool(flash.get("disabled"))
         self.machine = flash.get("machine")  # the machine's details, from check-in and most replies
@@ -203,6 +204,7 @@ class Reader:
         was_online = self.online
         self.online = not result.cut_off
         self.trouble = result.why
+        self.trouble_detail = result.detail
         if was_online and not self.online:
             log("BBMS can't be reached:", result.why)
             soon = now_ms() + RETRY_MS  # from here on only check-in is tried
@@ -787,7 +789,7 @@ class Reader:
                 machine.get("name") or "",
                 "%.1f A" % amps,
                 state,
-                "Tap fob or press Stop to end" if self.session else "Tap in to switch the machine on",
+                "Tap fob or press Stop to end" if self.session else "Tap in to switch it on",
             )
         if self.session:
             s = self.session
@@ -816,7 +818,10 @@ class Reader:
             if not self.hw.link_up():
                 return ("notice", "No Wi-Fi", "Retrying...", self.qr_version, False)
             if offline:
-                return ("notice", "BBMS unavailable", self.trouble or "Retrying...", self.qr_version, False)
+                detail = self.trouble or "Retrying..."
+                if self.trouble_detail:
+                    detail += " " + self.trouble_detail
+                return ("notice", "BBMS unavailable", detail, self.qr_version, False)
             if self.trouble:  # BBMS answers, and turns this reader away: a wrong key is a 401
                 return ("notice", "Reader refused", self.trouble, self.qr_version, False)
             return ("notice", "Not set up", "No machine for this reader", self.qr_version, False)

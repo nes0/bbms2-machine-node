@@ -11,6 +11,7 @@
 
 import asyncio
 import binascii
+import gc
 import hashlib
 import json
 import socket
@@ -36,7 +37,8 @@ STAGES = {
 
 
 class Result:
-    def __init__(self, status=0, data=None, etag=None, error=None, why=None):
+    def __init__(self, status=0, data=None, etag=None, error=None, why=None, detail=None):
+        self.detail = detail  # more about a failure, for whoever is finding out why (or None)
         self.status = status  # the HTTP status, or 0 if there was no reply
         self.data = data  # the JSON body (or the raw bytes, if asked for), or None
         self.etag = etag
@@ -97,6 +99,9 @@ class Api:
             exchange.close()  # it was never started
             return Result(error="no network", why="No Wi-Fi")
         self._stage = "dns"
+        # A secure connection needs some tens of kilobytes at once, on top of what the reader is using:
+        # clear out what's no longer needed first.
+        gc.collect()
         try:
             return await asyncio.wait_for(exchange, timeout)
         except asyncio.TimeoutError:
@@ -105,11 +110,46 @@ class Api:
             error = repr(error_)
         why = STAGES.get(self._stage)
         text = error.upper()
-        if "CERT" in text:
+        if "ALLOC" in text or "MEMORY" in text or "ENOMEM" in text:
+            why = "Out of memory"  # most often the secure connection: MBEDTLS_ERR_MPI_ALLOC_FAILED
+        elif "CERT" in text:
             why = "Certificate problem"  # run out, the wrong name, or not signed by the authority in ca_file
         elif "SSL" in text or "MBEDTLS" in text or "TLS" in text:
-            why = "Secure link failed"
-        return Result(error="%s: %s" % (self._stage, error), why=why)
+            # With the library's error number, so the cause can be found without a serial cable.
+            code = error.split("(", 1)[-1].split(",")[0].rstrip(")")
+            why = "Secure link failed" + (" (%s)" % code if code.lstrip("-").isdigit() else "")
+        detail = None
+        if why == "Out of memory":
+            # Which memory ran out, in a form short enough for the screen.
+            number = error.split("(", 1)[-1].split(",")[0].rstrip(")")
+            detail = ("Python" if "MemoryError" in error else "E" + number) + " " + self._memory()
+        elif MICROPYTHON:
+            log("memory:", self._memory())
+        return Result(error="%s: %s" % (self._stage, error), why=why, detail=detail)
+
+    def _memory(self):
+        """
+        How much memory is in use, since running out is a common cause of failures on the ESP32. There
+        are two pools. MicroPython's holds the program and its data; it grows by taking from the
+        system's, and never gives any back. The system's is what Wi-Fi and the secure connection use:
+        a secure connection needs about 40 KB of it, in blocks of up to 16 KB.
+        """
+        try:
+            import esp32
+
+            used = gc.mem_alloc()
+            regions = esp32.idf_heap_info(esp32.HEAP_DATA)  # (size, free, largest free block, least ever free)
+            text = "Py %d/%dK Sys %dK max %dK low %dK" % (
+                used // 1024,
+                (used + gc.mem_free()) // 1024,
+                sum([region[1] for region in regions]) // 1024,
+                max([region[2] for region in regions]) // 1024,
+                sum([region[3] for region in regions]) // 1024,
+            )
+        except Exception as error:  # not an ESP32
+            text = "(memory unknown: %r)" % error
+        log(text)
+        return text
 
     async def _resolve(self):
         """
