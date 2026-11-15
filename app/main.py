@@ -11,12 +11,12 @@
 # This is the one file an over-the-air update never replaces, and it uses nothing else from the firmware,
 # so a bad update can't stop it putting things right. Keep it small. It can only be changed over USB.
 #
-# How an update goes (ota.py does the first step; BBMS's side is in docs/device-api-v2.md there):
+# How an update goes (updater.py does the first step; BBMS's side is in docs/device-api-v2.md there):
 #   1. The running reader downloads the files that differ into /ota/new, checks each against its
 #      SHA-256, writes /ota/pending.json and restarts.
 #   2. The loader moves each old file to /ota/old and each new one into place, and writes
 #      /ota/trial.json: the new firmware is now on trial.
-#   3. When the new firmware has checked in with BBMS it deletes trial.json and /ota/old (ota.py).
+#   3. When the new firmware has checked in with BBMS it deletes trial.json and /ota/old (updater.py).
 #   4. If instead it fails to start, or has started MAX_TRIAL_STARTS times without reaching BBMS, the
 #      loader moves the old files back and writes /ota/failed.json, which the reader reports to BBMS.
 # Every step can be cut short by a power cut and carried on at the next start.

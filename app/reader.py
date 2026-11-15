@@ -129,7 +129,7 @@ class Reader:
     def __init__(self, hw, api, flash, screen, updater=None, offline_use=True):
         self.hw = hw
         self.offline_use = offline_use  # may members on the fob list use the machine while BBMS is away?
-        self.updater = updater  # firmware updates (ota.py); None where there are none, as in the simulation
+        self.updater = updater  # firmware updates (updater.py); None where there are none, as in the simulation
         self.update_wanted = None  # the firmware version BBMS wants here, while it differs from this one
         self.update_error = None  # (version, why the last attempt to download it failed)
         self.api = api
