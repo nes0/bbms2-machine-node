@@ -81,7 +81,7 @@ class Hardware:
 
         from epaper213 import EPD
 
-        self.epd = EPD()
+        self.epd = EPD(settings)
 
     # ---- What reader.py uses ----------------------------------------------------------------------
 

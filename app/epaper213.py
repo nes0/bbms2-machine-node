@@ -25,11 +25,21 @@ class EPD(display_base.EPD):
     Y_Addr_Start = 249
     Y_Addr_End = 0
 
-    spi = SPI(1, baudrate=2_000_000, polarity=0, phase=0, sck=Pin(18), mosi=Pin(23))
-    cs = Pin(5, Pin.OUT)
-    dc = Pin(17, Pin.OUT)
-    rst = Pin(16, Pin.OUT)
-    busy = Pin(4, Pin.IN)
+    def __init__(self, settings):
+        """settings: the reader's settings (config.py), for the display's GPIO numbers."""
+        self.spi = SPI(
+            1,
+            baudrate=2_000_000,
+            polarity=0,
+            phase=0,
+            sck=Pin(settings["pin_display_sck"]),
+            mosi=Pin(settings["pin_display_mosi"]),
+        )
+        self.cs = Pin(settings["pin_display_cs"], Pin.OUT)
+        self.dc = Pin(settings["pin_display_dc"], Pin.OUT)
+        self.rst = Pin(settings["pin_display_rst"], Pin.OUT)
+        self.busy = Pin(settings["pin_display_busy"], Pin.IN)
+        super().__init__()  # which calls init(), so the pins must be set by now
 
     def reset(self):
         self.rst.value(0)

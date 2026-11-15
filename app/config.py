@@ -30,9 +30,17 @@ DEFAULTS = {
     # credit can't be checked then; BBMS charges them when it hears of the session. False: nobody can
     # tap in without BBMS.
     "offline_use": True,
-    # GPIO numbers. The e-paper's are in epaper213.py (4, 5, 16, 17, 18, 23).
+    # GPIO numbers. They are chosen to work on an ESP32 module with extra RAM (a WROVER) too: that
+    # uses GPIO 16 and 17 itself. 0, 2, 12 and 15 set how the ESP32 starts up and are best left alone;
+    # 21 and 22 are kept free for I2C; 35, 36 and 39 are spare analogue inputs.
+    "pin_display_sck": 18,
+    "pin_display_mosi": 23,
+    "pin_display_cs": 5,
+    "pin_display_dc": 19,
+    "pin_display_rst": 25,
+    "pin_display_busy": 4,
     "pin_rfid_rx": 27,  # from the RDM6300's TX, through a divider: the RDM6300 is a 5 V part
-    "pin_rfid_tx": 25,  # not connected, but the UART must be given a pin that isn't used elsewhere
+    "pin_rfid_tx": 13,  # not connected, but the UART must be given a pin that isn't used elsewhere
     "pin_relay": 26,
     "relay_active_high": True,
     "pin_stop_button": 32,  # the buttons connect these to ground; the internal pull-ups are used
