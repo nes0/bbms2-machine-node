@@ -11,15 +11,20 @@ relay, two push buttons and a current transformer on the machine's supply.
 
 | What | GPIO | Notes |
 |---|---|---|
-| E-paper SCK, MOSI, CS, DC, RST, BUSY | 18, 23, 5, 17, 16, 4 | set in `app/epaper213.py` |
+| E-paper SCK, MOSI, CS, DC, RST, BUSY | 18, 23, 5, 19, 25, 4 | |
 | RDM6300 TX → ESP32 RX | 27 | 9600 baud. The RDM6300 is a 5 V part: use a divider or level shifter |
-| (UART TX, not connected) | 25 | the UART has to be given a spare pin, or it takes 17 from the display |
+| (UART TX, not connected) | 13 | the UART has to be given a spare pin of its own |
 | Relay | 26 | high = on; set `"relay_active_high": false` for an active-low relay board |
 | Stop button | 32 | button to ground; internal pull-up |
 | Fault button | 33 | button to ground; internal pull-up |
 | Current sensor | 34 | must be an ADC1 pin (32-39): ADC2 doesn't work while Wi-Fi is on |
 
-Every pin except the display's can be changed in `data/config.json` (the names are in `app/config.py`).
+Every pin can be changed in `data/config.json` (the names are in `app/config.py`).
+
+The pins are chosen so that the same board takes an ESP32 module with extra RAM (a WROVER), which uses GPIO 16
+and 17 itself: leave those two unconnected. 21 and 22 are kept free for I2C, and 35, 36 and 39 are spare analogue
+inputs. Readers wired before this map (display DC on 17 and RST on 16) need these in `data/config.json`:
+`"pin_display_dc": 17, "pin_display_rst": 16, "pin_rfid_tx": 25`.
 
 **Current sensor.** A current transformer on the machine's supply feeds an op-amp rectifier and filter, which
 gives the pin a steady voltage: about 0.29 V with the machine off, rising by about 62 mV for each amp. The
@@ -50,7 +55,7 @@ with, and left alone MicroPython would then take so much that no secure connecti
 prevents that by holding the connections' memory back while the program loads; the comment there explains it, and
 at start-up it logs four lines beginning `memory` that show how the memory was shared out. `system ... free` in the
 last of them should be above 40000. A module with extra RAM (ESP32-WROVER, or an S3 with PSRAM) and MicroPython's
-SPIRAM build would remove the limit, but those modules use GPIO 16 and 17, which the e-paper is wired to here.
+SPIRAM build would remove the limit; the pins above leave GPIO 16 and 17 free for one.
 
 The reader's serial console logs every request and reply. While developing, set `"watchdog_seconds": 0`, or
 the watchdog restarts the reader a minute after you stop the program.
